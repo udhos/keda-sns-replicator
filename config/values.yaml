@@ -1,0 +1,128 @@
+# Default values for sqs-to-sns.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: udhos/sqs-to-sns
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: sqs-to-sns-{{queue}}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# add custom labels to deployment pods
+customLabels:
+  app: sqs-to-sns-{{queue}}
+
+podAnnotations:
+  prometheus.io/path: /metrics
+  prometheus.io/port: "3000"
+  prometheus.io/scrape: "true"
+  sidecar.istio.io/inject: "false"
+
+podHealthCheck:
+  port: 8888
+  path: /health
+
+#
+# See: https://stackoverflow.com/questions/72816925/helm-templating-in-configmap-for-values-yaml
+#
+configMapProperties:
+  QUEUES: /etc/sqs-to-sns/queues.yaml
+  #
+  # health checks (use for livenessProbe only, not for readinessProbe)
+  #
+  HEALTH_ADDR: :8888
+  HEALTH_PATH: /health
+  #
+  # prometheus metrics
+  #
+  METRICS_ADDR: :3000
+  METRICS_PATH: /metrics
+  METRICS_NAMESPACE: sqstosns
+  #
+  # all env vars below define optional global defaults for per-queue config
+  #
+  #QUEUE_ROLE_ARN: arn:aws:iam::111111111111:role/sqs_consumer
+  #TOPIC_ROLE_ARN: arn:aws:iam::222222222222:role/sns_producer
+  READERS: "3"                # number of goroutines reading from SQS queue
+  WRITERS: "30"               # number of goroutines writing to SNS topic (recommended: 10 * READERS)
+  BUFFER: "60"                # buffer size between readers and writers (recommended: 20 * READERS)
+  READ_ERROR_COOLDOWN: 10s    # cooldown holdtime after read errors
+  WRITE_ERROR_COOLDOWN: 10s   # cooldown holdtime after write errors
+  DELETE_ERROR_COOLDOWN: 10s  # cooldown holdtime after delete errors
+  EMPTY_RECEIVE_COOLDOWN: 10s # cooldown holdtime after empty receive
+  COPY_ATTRIBUTES: "true"     # enable copying of message attributes from SQS message to SNS message
+  DEBUG: "true"               # enable debug logs
+  AWS_ACCESS_KEY_ID: put-access-key-id-here # Required.
+  AWS_SECRET_ACCESS_KEY: put-secret-here # Required.  
+
+configDir:
+  queues.yaml: |
+    - id: {{queue}}
+      #
+      # required
+      #
+      queue_url: https://sqs.us-east-1.amazonaws.com/123456789012/{{queue}}
+      topic_arn: arn:aws:sns:us-east-1:123456789012:{{topic}}
+      #
+      # optional
+      #
+      #queue_role_arn: arn:aws:iam::111111111111:role/sqs_consumer1
+      #topic_role_arn: arn:aws:iam::222222222222:role/sns_producer1
+      #readers: 1
+      #writers: 10 # recommended: 10*readers
+      #buffer: 20  # recommended: 20*readers
+      #error_cooldown_read: 10s
+      #error_cooldown_write: 10s
+      #error_cooldown_delete: 10s
+      #empty_receive_cooldown: 10s
+      #copy_attributes: true
+      #debug: true
+
+resources:
+  requests:
+    cpu: 300m
+    memory: 100Mi
+    ephemeral-storage: 100Mi
+  limits:
+    cpu: 2000m
+    memory: 200Mi
+    ephemeral-storage: 200Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  apiVersion: autoscaling/v2
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

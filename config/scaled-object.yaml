@@ -1,0 +1,40 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{queue}}
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: sqs-to-sns-{{queue}}
+  # pollingInterval: 30                                # Optional. Default: 30 seconds
+  # cooldownPeriod:  300                               # Optional. Default: 300 seconds
+  # minReplicaCount: 0                                 # Optional. Default: 0
+  # maxReplicaCount: 100                               # Optional. Default: 100
+  # advanced:                                          # Optional. Section to specify advanced options
+  #   restoreToOriginalReplicaCount: true/false        # Optional. Default: false
+  #   horizontalPodAutoscalerConfig:                   # Optional. Section to specify HPA related options
+  #     behavior:                                      # Optional. Use to modify HPA's scaling behavior
+  #       scaleDown:
+  #         stabilizationWindowSeconds: 300
+  #         policies:
+  #         - type: Percent
+  #           value: 100
+  #           periodSeconds: 15
+  triggers:
+  - type: aws-cloudwatch
+    metadata:
+      namespace: AWS/SQS
+      dimensionName: QueueName
+      dimensionValue: {{queue}}
+      #expression: SELECT MAX("ApproximateNumberOfMessagesVisible") FROM "AWS/SQS" WHERE QueueName = 'keda'
+      metricName: ApproximateNumberOfMessagesVisible
+      targetMetricValue: "2"
+      minMetricValue: "0"
+      awsRegion: "us-east-1"
+      # metricCollectionTime: "300" # default 300
+      # metricStat: "Average" # default "Average"
+      # metricStatPeriod: "300" # default 300
+      # metricUnit: "Count" # default ""
+      # metricEndTimeOffset: "60" # default 0      
+    authenticationRef:
+      name: keda-trigger-auth-aws
