@@ -1,0 +1,1 @@
+# keda-sns-replicator
